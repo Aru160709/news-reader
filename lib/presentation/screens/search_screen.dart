@@ -1,15 +1,35 @@
+// Import dasar Flutter untuk UI
 import 'package:flutter/material.dart';
+
+// Provider untuk state management
 import 'package:provider/provider.dart';
+
+// NewsProvider → mengatur data berita & pencarian
 import 'package:news_reader/presentation/providers/news_provider.dart';
-import 'package:news_reader/presentation/widgets/grid_news_card.dart'; // ← PENTING: Pakai GridNewsCard!
+
+// Widget kartu berita versi GRID
+import 'package:news_reader/presentation/widgets/grid_news_card.dart';
+
+// Widget loading
 import 'package:news_reader/presentation/widgets/loading_widget.dart';
+
+// Widget ketika data kosong
 import 'package:news_reader/presentation/widgets/empty_state_widget.dart';
+
+// Background dengan gradient
 import 'package:news_reader/presentation/widgets/gradient_background.dart';
+
+// Halaman detail berita
 import 'package:news_reader/presentation/screens/news_detail_screen.dart';
+
+// Theme aplikasi
 import 'package:news_reader/core/theme/app_theme.dart';
 
-/// Search Screen - UPDATED dengan Grid Layout
-/// Halaman untuk mencari berita dengan tampilan grid responsive
+/// ===============================
+/// SEARCH SCREEN
+/// Halaman untuk mencari berita
+/// dengan tampilan GRID responsive
+/// ===============================
 class SearchScreen extends StatefulWidget {
   const SearchScreen({Key? key}) : super(key: key);
 
@@ -18,13 +38,19 @@ class SearchScreen extends StatefulWidget {
 }
 
 class _SearchScreenState extends State<SearchScreen> {
+
+  // Controller untuk mengambil teks dari TextField
   final TextEditingController _searchController = TextEditingController();
+
+  // FocusNode → supaya keyboard langsung muncul
   final FocusNode _focusNode = FocusNode();
 
   @override
   void initState() {
     super.initState();
-    // Auto focus ke search field
+
+    // Setelah widget selesai dirender,
+    // langsung fokus ke kolom search
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _focusNode.requestFocus();
     });
@@ -32,6 +58,7 @@ class _SearchScreenState extends State<SearchScreen> {
 
   @override
   void dispose() {
+    // WAJIB dispose supaya tidak memory leak
     _searchController.dispose();
     _focusNode.dispose();
     super.dispose();
@@ -39,22 +66,30 @@ class _SearchScreenState extends State<SearchScreen> {
 
   @override
   Widget build(BuildContext context) {
+
+    // Mengecek apakah mode gelap aktif
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return GradientBackground(
       child: Scaffold(
         backgroundColor: Colors.transparent,
+
+        // AppBar berisi search field
         appBar: AppBar(
           backgroundColor: Colors.transparent,
           elevation: 0,
           title: _buildSearchField(context, isDark),
         ),
+
+        // Body utama
         body: _buildBody(context),
       ),
     );
   }
 
-  /// Search Field
+  /// ===============================
+  /// SEARCH FIELD (INPUT PENCARIAN)
+  /// ===============================
   Widget _buildSearchField(BuildContext context, bool isDark) {
     return Container(
       decoration: BoxDecoration(
@@ -70,20 +105,17 @@ class _SearchScreenState extends State<SearchScreen> {
       child: TextField(
         controller: _searchController,
         focusNode: _focusNode,
+
+        // Warna teks mengikuti theme
         style: TextStyle(
           color: isDark ? AppTheme.darkText : AppTheme.lightText,
         ),
+
         decoration: InputDecoration(
           hintText: 'Search news...',
-          hintStyle: TextStyle(
-            color: isDark
-                ? AppTheme.darkTextSecondary
-                : AppTheme.lightTextSecondary,
-          ),
-          prefixIcon: const Icon(
-            Icons.search,
-            color: AppTheme.primaryBlue,
-          ),
+          prefixIcon: const Icon(Icons.search, color: AppTheme.primaryBlue),
+
+          // Tombol clear muncul jika ada teks
           suffixIcon: _searchController.text.isNotEmpty
               ? IconButton(
                   icon: const Icon(Icons.clear),
@@ -94,26 +126,34 @@ class _SearchScreenState extends State<SearchScreen> {
                   },
                 )
               : null,
+
           border: InputBorder.none,
           contentPadding: const EdgeInsets.symmetric(
             horizontal: 20,
             vertical: 14,
           ),
         ),
+
+        // Dipanggil setiap teks berubah
         onChanged: (value) {
           setState(() {});
 
-          // Search dengan delay (debounce)
+          // Search hanya jika >= 3 huruf
           if (value.length >= 3) {
             Future.delayed(const Duration(milliseconds: 500), () {
+              // Cegah search berulang (debounce)
               if (_searchController.text == value) {
                 context.read<NewsProvider>().searchNews(value);
               }
             });
-          } else if (value.isEmpty) {
+          } 
+          // Jika kosong → hapus hasil pencarian
+          else if (value.isEmpty) {
             context.read<NewsProvider>().clearSearch();
           }
         },
+
+        // Saat tekan ENTER
         onSubmitted: (value) {
           if (value.isNotEmpty) {
             context.read<NewsProvider>().searchNews(value);
@@ -123,36 +163,40 @@ class _SearchScreenState extends State<SearchScreen> {
     );
   }
 
-  /// Body with search results - GRID VERSION!
+  /// ===============================
+  /// BODY HASIL SEARCH (GRID)
+  /// ===============================
   Widget _buildBody(BuildContext context) {
     return Consumer<NewsProvider>(
       builder: (context, newsProvider, child) {
-        // Initial State
+
+        // Kondisi awal (belum search)
         if (_searchController.text.isEmpty &&
             newsProvider.searchResults.isEmpty) {
           return _buildInitialState(context);
         }
 
-        // Loading State
+        // Loading
         if (newsProvider.isLoading) {
           return const CircularLoading(message: 'Searching...');
         }
 
-        // Error State
+        // Error
         if (newsProvider.hasError) {
           return ErrorStateWidget(
             message: newsProvider.errorMessage ?? 'Search failed',
-            onRetry: () => newsProvider.searchNews(_searchController.text),
+            onRetry: () =>
+                newsProvider.searchNews(_searchController.text),
           );
         }
 
-        // Empty Results
+        // Hasil kosong
         if (newsProvider.searchResults.isEmpty &&
             _searchController.text.isNotEmpty) {
           return EmptyStateWidget(
             icon: Icons.search_off,
             title: 'No Results Found',
-            message: 'Try different keywords or check your spelling',
+            message: 'Try different keywords',
             actionText: 'Clear',
             onActionPressed: () {
               _searchController.clear();
@@ -162,41 +206,47 @@ class _SearchScreenState extends State<SearchScreen> {
           );
         }
 
-        // Search Results - GRID LAYOUT! 🎯
+        // ===============================
+        // HASIL SEARCH → GRID VIEW
+        // ===============================
         return Center(
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 1200),
             child: LayoutBuilder(
               builder: (context, constraints) {
-                // Calculate columns based on screen width
+
+                // Menentukan jumlah kolom
                 int crossAxisCount;
                 if (constraints.maxWidth < 600) {
-                  crossAxisCount = 1; // Mobile: 1 kolom
+                  crossAxisCount = 1; // HP
                 } else if (constraints.maxWidth < 900) {
-                  crossAxisCount = 2; // Tablet: 2 kolom
+                  crossAxisCount = 2; // Tablet
                 } else {
-                  crossAxisCount = 3; // Desktop: 3 kolom
+                  crossAxisCount = 3; // Desktop
                 }
 
                 return GridView.builder(
                   padding: const EdgeInsets.all(16),
                   gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                     crossAxisCount: crossAxisCount,
-                    childAspectRatio: 4 / 3, // Ratio 4:3
+                    childAspectRatio: 4 / 3,
                     crossAxisSpacing: 16,
                     mainAxisSpacing: 16,
                   ),
                   itemCount: newsProvider.searchResults.length,
                   itemBuilder: (context, index) {
-                    final article = newsProvider.searchResults[index];
-                    final isBookmarked = newsProvider.isBookmarked(article.id);
+                    final article =
+                        newsProvider.searchResults[index];
+                    final isBookmarked =
+                        newsProvider.isBookmarked(article.id);
 
                     return GridNewsCard(
                       article: article,
                       isBookmarked: isBookmarked,
+
+                      // Buka detail berita
                       onTap: () {
                         newsProvider.markArticleAsRead(article.id);
-
                         Navigator.push(
                           context,
                           MaterialPageRoute(
@@ -205,6 +255,8 @@ class _SearchScreenState extends State<SearchScreen> {
                           ),
                         );
                       },
+
+                      // Bookmark
                       onBookmarkTap: () {
                         newsProvider.toggleBookmark(article);
 
@@ -215,8 +267,6 @@ class _SearchScreenState extends State<SearchScreen> {
                                   ? 'Removed from bookmarks'
                                   : 'Added to bookmarks',
                             ),
-                            duration: const Duration(seconds: 2),
-                            behavior: SnackBarBehavior.floating,
                           ),
                         );
                       },
@@ -231,84 +281,23 @@ class _SearchScreenState extends State<SearchScreen> {
     );
   }
 
-  /// Initial state (before search)
+  /// ===============================
+  /// TAMPILAN AWAL SEBELUM SEARCH
+  /// ===============================
   Widget _buildInitialState(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final isDark =
+        Theme.of(context).brightness == Brightness.dark;
 
     return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(32),
-              decoration: BoxDecoration(
-                gradient: AppTheme.primaryGradient.scale(0.3),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                Icons.search,
-                size: 64,
-                color: isDark ? AppTheme.accentBlue : AppTheme.primaryBlue,
-              ),
-            ),
-
-            const SizedBox(height: 24),
-
-            Text(
-              'Search for News',
-              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
-            ),
-
-            const SizedBox(height: 12),
-
-            Text(
-              'Enter at least 3 characters to search',
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: isDark
-                        ? AppTheme.darkTextSecondary
-                        : AppTheme.lightTextSecondary,
-                  ),
-              textAlign: TextAlign.center,
-            ),
-
-            const SizedBox(height: 32),
-
-            // Popular searches
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              alignment: WrapAlignment.center,
-              children: [
-                _buildSuggestionChip('Technology'),
-                _buildSuggestionChip('Business'),
-                _buildSuggestionChip('Sports'),
-                _buildSuggestionChip('Science'),
-                _buildSuggestionChip('Health'),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  /// Suggestion chip
-  Widget _buildSuggestionChip(String text) {
-    return ActionChip(
-      label: Text(text),
-      onPressed: () {
-        _searchController.text = text;
-        context.read<NewsProvider>().searchNews(text);
-        setState(() {});
-      },
-      backgroundColor: AppTheme.primaryBlue.withOpacity(0.1),
-      labelStyle: const TextStyle(
-        color: AppTheme.primaryBlue,
-        fontWeight: FontWeight.w600,
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.search, size: 64),
+          const SizedBox(height: 16),
+          Text('Search for News'),
+          const SizedBox(height: 8),
+          Text('Enter at least 3 characters'),
+        ],
       ),
     );
   }
